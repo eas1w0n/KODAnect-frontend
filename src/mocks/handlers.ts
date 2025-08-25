@@ -1,7 +1,8 @@
 import { http, HttpResponse } from "msw";
-import { donorListResponse } from "@/mocks/data/Memorial";
+import { donorListResponse, donorDetailResponse } from "@/mocks/data/Memorial";
 
 export const handlers = [
+  // 기증자 목록 조회
   http.get("*/remembrance/search", ({ request }) => {
     const url = new URL(request.url);
 
@@ -15,6 +16,13 @@ export const handlers = [
       cursorDate: cursorDate ?? undefined,
     });
 
+    return HttpResponse.json(body, { status: 200 });
+  }),
+
+  // 기증자 상세 조회
+  http.get("*/remembrance/:donateSeq", ({ params }) => {
+    const donateSeq = Number(params.donateSeq);
+    const body = donorDetailResponse(donateSeq);
     return HttpResponse.json(body, { status: 200 });
   }),
 ];
