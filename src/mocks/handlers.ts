@@ -1,6 +1,10 @@
 import { http, HttpResponse } from "msw";
 import { donorListResponse, donorDetailResponse } from "@/mocks/data/Memorial";
-import { heavenLetterDetailResponse, heavenLetterListResponse } from "@/mocks/data/heaven";
+import {
+  heavenLetterDetailResponse,
+  heavenLetterListResponse,
+  commentPagination,
+} from "@/mocks/data/heaven";
 
 export const handlers = [
   // 기증자 목록 조회
@@ -48,5 +52,21 @@ export const handlers = [
     const letterSeq = Number(params.letterSeq);
     const body = heavenLetterDetailResponse(letterSeq);
     return HttpResponse.json(body, { status: 200 });
+  }),
+
+  // 하늘나라 편지 댓글 더보기
+  http.get("*/heavenLetters/:letterSeq/comments", ({ request, params }) => {
+    const url = new URL(request.url);
+    const size = Number(url.searchParams.get("size")) || 3;
+    const cursor = url.searchParams.get("commentCursor");
+    const cursorSeq = cursor ? Number(cursor) : undefined;
+
+    const letterSeq = Number(params.letterSeq);
+    const data = commentPagination(letterSeq, size, cursorSeq);
+
+    return HttpResponse.json(
+      { success: true, code: 200, message: "댓글 조회 성공", data },
+      { status: 200 },
+    );
   }),
 ];

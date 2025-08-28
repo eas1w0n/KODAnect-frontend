@@ -1,44 +1,73 @@
 import { fakerKO as faker } from "@faker-js/faker";
 import type { ApiResponse } from "@/shared/api/common/types";
-import type { CommentPagination } from "@/shared/api/recipient-view/comment/types";
 import type {
   HeavenLetterDetail,
   HeavenLetterDetailResponse,
 } from "@/shared/api/letter-view/letter/types";
+import type { Comment, CommentPagination } from "@/shared/api/recipient-view/comment/types";
 
-//시드 고정
+// 시드 고정
 faker.seed(42);
 
-/** 전역 데이터: HeavenLetterDetail[] 만 사용 (새 타입 없음) */
+/** 전역 데이터: HeavenLetterDetail[] 만 사용 */
 const TOTAL = 300;
 
-function makeCommentPaginationForLetter(size = 3): CommentPagination {
-  const comments = Array.from({ length: size }, () => ({
-    commentSeq: faker.number.int({ min: 1, max: 10000 }),
-    donateSeq: 0,
-    commentWriter: faker.person.fullName(),
-    contents: faker.lorem.sentences({ min: 1, max: 3 }),
-    writeTime: faker.date.past().toISOString(),
-  }));
+/** 댓글 풀 + 슬라이스 */
+const commentsByLetter = new Map<number, Comment[]>();
 
-  comments.sort((a, b) => new Date(b.writeTime).getTime() - new Date(a.writeTime).getTime());
+function LetterCommentPool(letterSeq: number, poolSize = 80): Comment[] {
+  if (!commentsByLetter.has(letterSeq)) {
+    const pool: Comment[] = Array.from({ length: poolSize }, () => ({
+      commentSeq: faker.number.int({ min: 1, max: 1000000 }),
+      letterSeq, // 편지 기준
+      commentWriter: faker.person.fullName(),
+      contents: faker.lorem.sentences({ min: 1, max: 3 }),
+      writeTime: faker.date.past().toISOString(),
+    })).sort((a, b) => new Date(b.writeTime!).getTime() - new Date(a.writeTime!).getTime());
+    commentsByLetter.set(letterSeq, pool);
+  }
+  return commentsByLetter.get(letterSeq)!;
+}
+
+function sliceLetterComments(letterSeq: number, size = 3, cursorSeq?: number): CommentPagination {
+  const pool = LetterCommentPool(letterSeq);
+
+  let start = 0;
+  if (cursorSeq) {
+    const idx = pool.findIndex((c) => c.commentSeq === cursorSeq);
+    start = idx >= 0 ? idx + 1 : pool.length;
+  }
+
+  const page = pool.slice(start, start + size);
+  const hasNext = start + size < pool.length;
+  const nextCursor = hasNext && page.length ? page.at(-1)!.commentSeq : 0;
 
   return {
-    content: comments,
-    comments,
-    commentNextCursor: 0,
-    commentHasNext: false,
+    content: page,
+    comments: page,
+    commentHasNext: hasNext,
+    commentNextCursor: nextCursor,
   };
 }
 
-function makeHeavenLetterDetail(seq?: number): HeavenLetterDetail {
+/** 커서 기반 */
+export function commentPagination(
+  letterSeq: number,
+  size = 3,
+  cursorSeq?: number,
+): CommentPagination {
+  return sliceLetterComments(letterSeq, size, cursorSeq);
+}
+
+/* ------------------------- 편지 상세 생성 ------------------------- */
+function heavenLetterDetail(seq?: number): HeavenLetterDetail {
   const writeDt = faker.date.past();
   const anonymityFlag = faker.helpers.arrayElement<"Y" | "N">(["Y", "N"]);
   const donorName = faker.person.fullName();
   const writerName = anonymityFlag === "Y" ? "익명" : faker.person.fullName();
 
-  const letterSeq = seq ?? faker.number.int({ min: 1, max: 1_000_000 });
-  const donateSeq = faker.number.int({ min: 1, max: 10_000 });
+  const letterSeq = seq ?? faker.number.int({ min: 1, max: 1000000 });
+  const donateSeq = faker.number.int({ min: 1, max: 10000 });
 
   return {
     letterSeq,
@@ -58,16 +87,19 @@ function makeHeavenLetterDetail(seq?: number): HeavenLetterDetail {
         : "",
     orgFileName: Math.random() < 0.2 ? `원본_${letterSeq}.jpg` : "",
     writeTime: writeDt.toISOString().slice(0, 10),
-    cursorCommentPaginationResponse: makeCommentPaginationForLetter(3),
+
+    // 초기 댓글 페이지 (cursor 없음)
+    cursorCommentPaginationResponse: commentPagination(letterSeq, 3),
   };
 }
 
+/* ---------- 목록/정렬/커서 페이징 (기존 유지) ---------- */
 /** 한 번만 생성해 재사용 */
-export const ALL_HEAVEN_LETTERS: HeavenLetterDetail[] = Array.from({ length: TOTAL }, () =>
-  makeHeavenLetterDetail(),
+export const allHeavenLetters: HeavenLetterDetail[] = Array.from({ length: TOTAL }, () =>
+  heavenLetterDetail(),
 );
 
-/** 정렬: writeTime 내림차순 → 같은 날짜면 letterSeq 내림차순 */
+/** writeTime 내림차순 → 같은 날짜면 letterSeq 내림차순 */
 const byWriteDesc = (a: HeavenLetterDetail, b: HeavenLetterDetail) => {
   const ta = new Date(a.writeTime).getTime();
   const tb = new Date(b.writeTime).getTime();
@@ -75,31 +107,31 @@ const byWriteDesc = (a: HeavenLetterDetail, b: HeavenLetterDetail) => {
   return b.letterSeq - a.letterSeq;
 };
 
-ALL_HEAVEN_LETTERS.sort(byWriteDesc);
+allHeavenLetters.sort(byWriteDesc);
 
-/** 커서 페이징 (Memorial.ts와 동일 규칙: date(YYYY-MM-DD) + seq) */
+/** 커서 페이징 (편지 목록용) */
 function sliceByCursor(
   size: number,
   cursor?: { seq: number; date: string }, // date는 YYYY-MM-DD
 ) {
   let start = 0;
   if (cursor) {
-    const idx = ALL_HEAVEN_LETTERS.findIndex(
+    const idx = allHeavenLetters.findIndex(
       (d) => d.letterSeq === cursor.seq && d.writeTime.slice(0, 10) === cursor.date,
     );
-    start = idx >= 0 ? idx + 1 : ALL_HEAVEN_LETTERS.length;
+    start = idx >= 0 ? idx + 1 : allHeavenLetters.length;
   }
 
-  const window = ALL_HEAVEN_LETTERS.slice(start, start + size);
-  const hasNext = start + size < ALL_HEAVEN_LETTERS.length;
+  const window = allHeavenLetters.slice(start, start + size);
+  const hasNext = start + size < allHeavenLetters.length;
   const last = window.at(-1);
   const nextCursor =
     hasNext && last ? { cursor: last.letterSeq, date: last.writeTime.slice(0, 10) } : null;
 
-  return { window, hasNext, nextCursor, totalCount: ALL_HEAVEN_LETTERS.length };
+  return { window, hasNext, nextCursor, totalCount: allHeavenLetters.length };
 }
 
-/** 목록 응답: LetterCardData[] 로 바로 내려줌 (추가 타입 없음) */
+/** 목록 응답: LetterCardData[] 로 바로 내려줌 */
 export function heavenLetterListResponse(params?: {
   size?: number;
   cursorSeq?: number;
@@ -126,12 +158,11 @@ export function heavenLetterListResponse(params?: {
 
   const { window, hasNext, nextCursor, totalCount } = sliceByCursor(size, cursor);
 
-  // 목록은 원시 필드 그대로 내려줌 (UI 매퍼에서 LetterCardData로 변환)
   const items = window.map((d) => ({
     letterSeq: d.letterSeq,
     donateSeq: d.donateSeq,
     donorName: d.donorName,
-    letterWriter: d.letterWriter, // ← "추모자" 표시에 필요
+    letterWriter: d.letterWriter,
     letterTitle: d.letterTitle,
     readCount: d.readCount,
     writeTime: d.writeTime.slice(0, 10), // YYYY-MM-DD
@@ -145,29 +176,43 @@ export function heavenLetterListResponse(params?: {
   };
 }
 
-/** 상세: HeavenLetterDetail 그대로 사용 (캐시 포함) */
+/** 상세: HeavenLetterDetail 그대로 사용 */
 const DETAIL_CACHE = new Map<number, HeavenLetterDetail>();
 
 export function getHeavenLetterDetail(letterSeq: number): HeavenLetterDetail {
   if (DETAIL_CACHE.has(letterSeq)) return DETAIL_CACHE.get(letterSeq)!;
 
-  // 목록에서 찾고, 없으면 새로 생성해서 합류
-  let found = ALL_HEAVEN_LETTERS.find((d) => d.letterSeq === letterSeq);
+  // 목록에서 찾고, 없으면 새로 생성
+  let found = allHeavenLetters.find((d) => d.letterSeq === letterSeq);
   if (!found) {
-    found = makeHeavenLetterDetail(letterSeq);
-    ALL_HEAVEN_LETTERS.push(found);
-    ALL_HEAVEN_LETTERS.sort(byWriteDesc);
+    found = heavenLetterDetail(letterSeq);
+    allHeavenLetters.push(found);
+    allHeavenLetters.sort(byWriteDesc);
   }
 
   DETAIL_CACHE.set(letterSeq, found);
   return found;
 }
 
-export function heavenLetterDetailResponse(letterSeq: number): HeavenLetterDetailResponse {
+export function heavenLetterDetailResponse(
+  letterSeq: number,
+  opts?: { commentSize?: number; commentCursor?: number },
+): HeavenLetterDetailResponse {
+  const base = getHeavenLetterDetail(letterSeq); // 캐시된 상세 가져오기
+
+  const size = opts?.commentSize ?? 3;
+  const cursor = opts?.commentCursor;
+
+  // 댓글 페이지네이션은 항상 새로 계산해서 내려줌
+  const withComments: HeavenLetterDetail = {
+    ...base,
+    cursorCommentPaginationResponse: commentPagination(letterSeq, size, cursor),
+  };
+
   return {
     success: true,
     code: 200,
     message: "하늘나라 편지 상세 조회 성공",
-    data: getHeavenLetterDetail(letterSeq),
+    data: withComments,
   };
 }
