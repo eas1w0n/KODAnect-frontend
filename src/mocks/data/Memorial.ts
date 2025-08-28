@@ -19,8 +19,8 @@ const makeDonor = (): DonorData => ({
   genderFlag: faker.helpers.arrayElement(["M", "F"]),
   donateAge: faker.number.int({ min: 1, max: 100 }),
   donateDate: faker.date.past().toISOString().slice(0, 10), // YYYY-MM-DD
-  commentCount: faker.number.int({ min: 0, max: 50 }),
-  letterCount: faker.number.int({ min: 0, max: 50 }),
+  commentCount: faker.number.int({ min: 0, max: 30 }),
+  letterCount: faker.number.int({ min: 0, max: 30 }),
 });
 
 // 2) 전역 데이터셋 300개를 한 번만 생성
@@ -152,8 +152,12 @@ export function donorDetailResponse(donateSeq: number): MemberDetailResponse {
 // 기증자별 댓글 풀
 const commentsByDonor = new Map<number, Comment[]>();
 
-function ensureDonorCommentPool(donateSeq: number, poolSize = 10): Comment[] {
+function ensureDonorCommentPool(donateSeq: number): Comment[] {
   if (!commentsByDonor.has(donateSeq)) {
+    // 목록에서 설정해둔 commentCount 사용
+    const donor = ALL_DONORS.find((d) => d.donateSeq === donateSeq);
+    const poolSize = donor?.commentCount ?? 0; // 없으면 0개
+
     const pool: Comment[] = Array.from({ length: poolSize }, () => ({
       commentSeq: faker.number.int({ min: 1, max: 1000000 }),
       donateSeq, // 기증자 기준
