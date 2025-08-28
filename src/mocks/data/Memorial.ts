@@ -3,7 +3,7 @@ import type { DonorData, DonorListResponse } from "@/shared/types/remembrance/Do
 import type { ApiResponse } from "@/shared/api/common/types";
 import type { MemberDetail, MemberDetailResponse } from "@/shared/api/members-view/member/types";
 import type { HeavenLetterPagination } from "@/shared/api/members-view/letter/types";
-import type { CommentPagination } from "@/shared/api/recipient-view/comment/types";
+import type { Comment, CommentPagination } from "@/shared/api/recipient-view/comment/types";
 
 import { format, parseISO } from "date-fns";
 
@@ -149,25 +149,57 @@ export function donorDetailResponse(donateSeq: number): MemberDetailResponse {
   };
 }
 
-// 댓글 페이지네이션 생성 함수
-export function makeCommentPagination(donateSeq: number, size = 3): CommentPagination {
-  const comments = Array.from({ length: size }, () => ({
-    commentSeq: faker.number.int({ min: 1, max: 10000 }),
-    donateSeq,
-    commentWriter: faker.person.fullName(),
-    contents: faker.lorem.sentence(),
-    writeTime: faker.date.past().toISOString(),
-  }));
+// 기증자별 댓글 풀
+const commentsByDonor = new Map<number, Comment[]>();
 
-  // 최신순 정렬
-  comments.sort((a, b) => new Date(b.writeTime).getTime() - new Date(a.writeTime).getTime());
+function ensureDonorCommentPool(donateSeq: number, poolSize = 10): Comment[] {
+  if (!commentsByDonor.has(donateSeq)) {
+    const pool: Comment[] = Array.from({ length: poolSize }, () => ({
+      commentSeq: faker.number.int({ min: 1, max: 1000000 }),
+      donateSeq, // 기증자 기준
+      commentWriter: faker.person.fullName(),
+      contents: faker.lorem.sentence(),
+      writeTime: faker.date.past().toISOString(),
+    }));
+    // 최신순 고정
+    pool.sort((a, b) => new Date(b.writeTime!).getTime() - new Date(a.writeTime!).getTime());
+    commentsByDonor.set(donateSeq, pool);
+  }
+  return commentsByDonor.get(donateSeq)!;
+}
+
+function sliceDonorCommentsByCursor(
+  donateSeq: number,
+  size = 3,
+  cursorSeq?: number,
+): CommentPagination {
+  const pool = ensureDonorCommentPool(donateSeq);
+
+  let start = 0;
+  if (cursorSeq) {
+    const idx = pool.findIndex((c) => c.commentSeq === cursorSeq);
+    start = idx >= 0 ? idx + 1 : pool.length;
+  }
+
+  const page = pool.slice(start, start + size);
+  const hasNext = start + size < pool.length;
+  const nextCursor = hasNext && page.length ? page.at(-1)!.commentSeq : 0;
 
   return {
-    content: comments,
-    comments,
-    commentNextCursor: 0,
-    commentHasNext: false,
+    content: page,
+    comments: page,
+    commentHasNext: hasNext,
+    commentNextCursor: nextCursor,
   };
+}
+
+// 댓글 페이지네이션 생성 함수
+export function makeCommentPagination(
+  donateSeq: number,
+  size = 3,
+  cursorSeq?: number,
+): CommentPagination {
+  return sliceDonorCommentsByCursor(donateSeq, size, cursorSeq);
 }
 
 // 편지 페이지네이션 생성 함수

@@ -15,7 +15,7 @@ const TOTAL = 300;
 /** 댓글 풀 + 슬라이스 */
 const commentsByLetter = new Map<number, Comment[]>();
 
-function LetterCommentPool(letterSeq: number, poolSize = 80): Comment[] {
+function LetterCommentPool(letterSeq: number, poolSize = 10): Comment[] {
   if (!commentsByLetter.has(letterSeq)) {
     const pool: Comment[] = Array.from({ length: poolSize }, () => ({
       commentSeq: faker.number.int({ min: 1, max: 1000000 }),

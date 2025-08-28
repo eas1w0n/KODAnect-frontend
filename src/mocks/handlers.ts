@@ -1,5 +1,9 @@
 import { http, HttpResponse } from "msw";
-import { donorListResponse, donorDetailResponse } from "@/mocks/data/Memorial";
+import {
+  donorListResponse,
+  donorDetailResponse,
+  makeCommentPagination,
+} from "@/mocks/data/Memorial";
 import {
   heavenLetterDetailResponse,
   heavenLetterListResponse,
@@ -29,6 +33,22 @@ export const handlers = [
     const donateSeq = Number(params.donateSeq);
     const body = donorDetailResponse(donateSeq);
     return HttpResponse.json(body, { status: 200 });
+  }),
+
+  // 기증자 댓글 더보기
+  http.get("*/remembrance/:donateSeq/comment", ({ request, params }) => {
+    const url = new URL(request.url);
+    const size = Number(url.searchParams.get("size")) || 3;
+    const cursor = url.searchParams.get("cursor");
+    const cursorSeq = cursor ? Number(cursor) : undefined;
+
+    const donateSeq = Number(params.donateSeq);
+    const data = makeCommentPagination(donateSeq, size, cursorSeq);
+
+    return HttpResponse.json(
+      { success: true, code: 200, message: "댓글 조회 성공", data },
+      { status: 200 },
+    );
   }),
 
   // 하늘나라 편지 목록 조회
