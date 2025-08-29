@@ -4,7 +4,7 @@ import type {
   HeavenLetterDetail,
   HeavenLetterDetailResponse,
 } from "@/shared/api/letter-view/letter/types";
-import type { Comment, CommentPagination } from "@/shared/api/recipient-view/comment/types";
+import type { CommentPagination } from "@/shared/api/recipient-view/comment/types";
 import { createCursorPagination, createDateDescSorter } from "@/mocks/utils/paginate";
 import { commentPoolManager } from "@/mocks/utils/commentPool";
 
