@@ -14,6 +14,7 @@
   "dependencies": {
     "@ckeditor/ckeditor5-build-classic": "^44.3.0",
     "@ckeditor/ckeditor5-react": "^9.5.0",
+    "@faker-js/faker": "^9.9.0",
     "@tailwindcss/line-clamp": "^0.4.4",
     "@tanstack/react-query": "^5.76.1",
     "axios": "^1.9.0",
@@ -21,6 +22,7 @@
     "date-fns": "^4.1.0",
     "html-react-parser": "^5.2.5",
     "lodash": "^4.17.21",
+    "msw": "^2.10.5",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-router-dom": "^7.6.1",
@@ -78,6 +80,11 @@
   "eslintConfig": {
     "extends": [
       "plugin:storybook/recommended"
+    ]
+  },
+  "msw": {
+    "workerDirectory": [
+      "public"
     ]
   }
 }
