@@ -5,6 +5,7 @@ import type {
   HeavenLetterDetailResponse,
 } from "@/shared/api/letter-view/letter/types";
 import type { Comment, CommentPagination } from "@/shared/api/recipient-view/comment/types";
+import { createCursorPagination, createDateDescSorter } from "@/mocks/utils/paginate";
 
 // 시드 고정
 faker.seed(42);
@@ -99,39 +100,15 @@ export const allHeavenLetters: HeavenLetterDetail[] = Array.from({ length: TOTAL
   heavenLetterDetail(),
 );
 
-/** writeTime 내림차순 → 같은 날짜면 letterSeq 내림차순 */
-const byWriteDesc = (a: HeavenLetterDetail, b: HeavenLetterDetail) => {
-  const ta = new Date(a.writeTime).getTime();
-  const tb = new Date(b.writeTime).getTime();
-  if (ta !== tb) return tb - ta;
-  return b.letterSeq - a.letterSeq;
-};
+/** writeTime 정렬 유틸 사용 */
+const sorter = createDateDescSorter(
+  (item: HeavenLetterDetail) => item.writeTime,
+  (item: HeavenLetterDetail) => item.letterSeq,
+);
 
-allHeavenLetters.sort(byWriteDesc);
+allHeavenLetters.sort(sorter);
 
-/** 커서 페이징 (편지 목록용) */
-function sliceByCursor(
-  size: number,
-  cursor?: { seq: number; date: string }, // date는 YYYY-MM-DD
-) {
-  let start = 0;
-  if (cursor) {
-    const idx = allHeavenLetters.findIndex(
-      (d) => d.letterSeq === cursor.seq && d.writeTime.slice(0, 10) === cursor.date,
-    );
-    start = idx >= 0 ? idx + 1 : allHeavenLetters.length;
-  }
-
-  const window = allHeavenLetters.slice(start, start + size);
-  const hasNext = start + size < allHeavenLetters.length;
-  const last = window.at(-1);
-  const nextCursor =
-    hasNext && last ? { cursor: last.letterSeq, date: last.writeTime.slice(0, 10) } : null;
-
-  return { window, hasNext, nextCursor, totalCount: allHeavenLetters.length };
-}
-
-/** 목록 응답: LetterCardData[] 로 바로 내려줌 */
+/** 편지 목록 응답 - 페이지네이션 유틸  */
 export function heavenLetterListResponse(params?: {
   size?: number;
   cursorSeq?: number;
@@ -156,7 +133,19 @@ export function heavenLetterListResponse(params?: {
       ? { seq: params.cursorSeq, date: params.cursorDate }
       : undefined;
 
-  const { window, hasNext, nextCursor, totalCount } = sliceByCursor(size, cursor);
+  // 페이지네이션 유틸 사용
+  const {
+    content: window,
+    hasNext,
+    nextCursor,
+    totalCount,
+  } = createCursorPagination(
+    allHeavenLetters,
+    size,
+    cursor,
+    (item) => item.letterSeq,
+    (item) => item.writeTime,
+  );
 
   const items = window.map((d) => ({
     letterSeq: d.letterSeq,
@@ -176,7 +165,7 @@ export function heavenLetterListResponse(params?: {
   };
 }
 
-/** 상세: HeavenLetterDetail 그대로 사용 */
+/** 상세 조회 캐시 */
 const DETAIL_CACHE = new Map<number, HeavenLetterDetail>();
 
 export function getHeavenLetterDetail(letterSeq: number): HeavenLetterDetail {
@@ -187,7 +176,7 @@ export function getHeavenLetterDetail(letterSeq: number): HeavenLetterDetail {
   if (!found) {
     found = heavenLetterDetail(letterSeq);
     allHeavenLetters.push(found);
-    allHeavenLetters.sort(byWriteDesc);
+    allHeavenLetters.sort(sorter);
   }
 
   DETAIL_CACHE.set(letterSeq, found);
@@ -203,7 +192,7 @@ export function heavenLetterDetailResponse(
   const size = opts?.commentSize ?? 3;
   const cursor = opts?.commentCursor;
 
-  // 댓글 페이지네이션은 항상 새로 계산해서 내려줌
+  // 댓글 페이지네이션은 항상 새로 계산
   const withComments: HeavenLetterDetail = {
     ...base,
     cursorCommentPaginationResponse: commentPagination(letterSeq, size, cursor),

@@ -1,18 +1,18 @@
 import { fakerKO as faker } from "@faker-js/faker";
+import { format, parseISO } from "date-fns";
 import type { DonorData, DonorListResponse } from "@/shared/types/remembrance/DonorData.types";
 import type { ApiResponse } from "@/shared/api/common/types";
 import type { MemberDetail, MemberDetailResponse } from "@/shared/api/members-view/member/types";
 import type { HeavenLetterPagination } from "@/shared/api/members-view/letter/types";
 import type { Comment, CommentPagination } from "@/shared/api/recipient-view/comment/types";
-
-import { format, parseISO } from "date-fns";
+import { createCursorPagination, createDateDescSorter } from "@/mocks/utils/paginate";
 
 /** 시드 고정 */
 faker.seed(42);
 
 /** 기증자 목록 조회 데이터 */
 
-// 1) 아이템 생성기
+// 아이템 생성
 const makeDonor = (): DonorData => ({
   donateSeq: faker.number.int({ min: 1, max: 10000 }),
   donorName: faker.person.fullName(),
@@ -23,42 +23,20 @@ const makeDonor = (): DonorData => ({
   letterCount: faker.number.int({ min: 0, max: 30 }),
 });
 
-// 2) 전역 데이터셋 300개를 한 번만 생성
+// 전역 데이터셋 300개를 한 번만 생성
 const TOTAL = 300;
 export const ALL_DONORS: DonorData[] = Array.from({ length: TOTAL }, makeDonor);
 
-// 3) 날짜 내림차순 → 같은 날짜면 donateSeq 내림차순
-const byDateDesc = (a: DonorData, b: DonorData) => {
-  const ta = new Date(a.donateDate).getTime();
-  const tb = new Date(b.donateDate).getTime();
-  if (ta !== tb) return tb - ta;
-  return b.donateSeq - a.donateSeq;
-};
+// 정렬 유틸 사용
+const sorter = createDateDescSorter(
+  (item: DonorData) => item.donateDate,
+  (item: DonorData) => item.donateSeq,
+);
 
-// 4) 정렬 한 번만 적용
-ALL_DONORS.sort(byDateDesc);
+// 정렬 한 번만 적용
+ALL_DONORS.sort(sorter);
 
-// 5) 커서 기반 페이지 추출
-function slice(size: number, cursor?: { seq: number; date: string }) {
-  let start = 0;
-
-  if (cursor) {
-    // cursor가 가리키는 아이템의 "다음"부터 시작
-    const idx = ALL_DONORS.findIndex(
-      (d) => d.donateSeq === cursor.seq && d.donateDate === cursor.date,
-    );
-    start = idx >= 0 ? idx + 1 : ALL_DONORS.length;
-  }
-
-  const content = ALL_DONORS.slice(start, start + size);
-  const hasNext = start + size < ALL_DONORS.length;
-  const last = content.at(-1);
-  const nextCursor = hasNext && last ? { cursor: last.donateSeq, date: last.donateDate } : null;
-
-  return { content, hasNext, nextCursor, totalCount: ALL_DONORS.length };
-}
-
-// 6) 응답 빌더
+// 기증자 목록 응답 - 페이지네이션 유틸 사용
 export function donorListResponse(params?: {
   size?: number;
   cursorSeq?: number;
@@ -70,7 +48,13 @@ export function donorListResponse(params?: {
       ? { seq: params.cursorSeq, date: params.cursorDate }
       : undefined;
 
-  const { content, hasNext, nextCursor, totalCount } = slice(size, cursor);
+  const { content, hasNext, nextCursor, totalCount } = createCursorPagination(
+    ALL_DONORS,
+    size,
+    cursor,
+    (item) => item.donateSeq,
+    (item) => item.donateDate,
+  );
 
   return {
     success: true,
