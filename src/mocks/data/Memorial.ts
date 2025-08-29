@@ -4,8 +4,9 @@ import type { DonorData, DonorListResponse } from "@/shared/types/remembrance/Do
 import type { ApiResponse } from "@/shared/api/common/types";
 import type { MemberDetail, MemberDetailResponse } from "@/shared/api/members-view/member/types";
 import type { HeavenLetterPagination } from "@/shared/api/members-view/letter/types";
-import type { Comment, CommentPagination } from "@/shared/api/recipient-view/comment/types";
+import type { CommentPagination } from "@/shared/api/recipient-view/comment/types";
 import { createCursorPagination, createDateDescSorter } from "@/mocks/utils/paginate";
+import { commentPoolManager } from "@/mocks/utils/commentPool";
 
 /** 시드 고정 */
 faker.seed(42);
@@ -133,61 +134,24 @@ export function donorDetailResponse(donateSeq: number): MemberDetailResponse {
   };
 }
 
-// 기증자별 댓글 풀
-const commentsByDonor = new Map<number, Comment[]>();
-
-function ensureDonorCommentPool(donateSeq: number): Comment[] {
-  if (!commentsByDonor.has(donateSeq)) {
-    // 목록에서 설정해둔 commentCount 사용
-    const donor = ALL_DONORS.find((d) => d.donateSeq === donateSeq);
-    const poolSize = donor?.commentCount ?? 0; // 없으면 0개
-
-    const pool: Comment[] = Array.from({ length: poolSize }, () => ({
-      commentSeq: faker.number.int({ min: 1, max: 1000000 }),
-      donateSeq, // 기증자 기준
-      commentWriter: faker.person.fullName(),
-      contents: faker.lorem.sentence(),
-      writeTime: faker.date.past().toISOString(),
-    }));
-    // 최신순 고정
-    pool.sort((a, b) => new Date(b.writeTime!).getTime() - new Date(a.writeTime!).getTime());
-    commentsByDonor.set(donateSeq, pool);
-  }
-  return commentsByDonor.get(donateSeq)!;
-}
-
-function sliceDonorCommentsByCursor(
-  donateSeq: number,
-  size = 3,
-  cursorSeq?: number,
-): CommentPagination {
-  const pool = ensureDonorCommentPool(donateSeq);
-
-  let start = 0;
-  if (cursorSeq) {
-    const idx = pool.findIndex((c) => c.commentSeq === cursorSeq);
-    start = idx >= 0 ? idx + 1 : pool.length;
-  }
-
-  const page = pool.slice(start, start + size);
-  const hasNext = start + size < pool.length;
-  const nextCursor = hasNext && page.length ? page.at(-1)!.commentSeq : 0;
-
-  return {
-    content: page,
-    comments: page,
-    commentHasNext: hasNext,
-    commentNextCursor: nextCursor,
-  };
-}
-
-// 댓글 페이지네이션 생성 함수
+// 기증자별 댓글 풀 유틸 사용
 export function makeCommentPagination(
   donateSeq: number,
   size = 3,
   cursorSeq?: number,
 ): CommentPagination {
-  return sliceDonorCommentsByCursor(donateSeq, size, cursorSeq);
+  // 목록에서 설정해둔 commentCount 사용
+  const donor = ALL_DONORS.find((d) => d.donateSeq === donateSeq);
+  const poolSize = donor?.commentCount ?? 0;
+
+  return commentPoolManager.createAndSlice(
+    `donor-${donateSeq}`,
+    poolSize,
+    "donateSeq",
+    donateSeq,
+    size,
+    cursorSeq,
+  );
 }
 
 // 편지 페이지네이션 생성 함수

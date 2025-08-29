@@ -6,61 +6,30 @@ import type {
 } from "@/shared/api/letter-view/letter/types";
 import type { Comment, CommentPagination } from "@/shared/api/recipient-view/comment/types";
 import { createCursorPagination, createDateDescSorter } from "@/mocks/utils/paginate";
+import { commentPoolManager } from "@/mocks/utils/commentPool";
 
 // 시드 고정
 faker.seed(42);
 
-/** 전역 데이터: HeavenLetterDetail[] 만 사용 */
 const TOTAL = 300;
 
 /** 댓글 풀 + 슬라이스 */
-const commentsByLetter = new Map<number, Comment[]>();
-
-function LetterCommentPool(letterSeq: number, poolSize = 10): Comment[] {
-  if (!commentsByLetter.has(letterSeq)) {
-    const pool: Comment[] = Array.from({ length: poolSize }, () => ({
-      commentSeq: faker.number.int({ min: 1, max: 1000000 }),
-      letterSeq, // 편지 기준
-      commentWriter: faker.person.fullName(),
-      contents: faker.lorem.sentences({ min: 1, max: 3 }),
-      writeTime: faker.date.past().toISOString(),
-    })).sort((a, b) => new Date(b.writeTime!).getTime() - new Date(a.writeTime!).getTime());
-    commentsByLetter.set(letterSeq, pool);
-  }
-  return commentsByLetter.get(letterSeq)!;
-}
-
-function sliceLetterComments(letterSeq: number, size = 3, cursorSeq?: number): CommentPagination {
-  const pool = LetterCommentPool(letterSeq);
-
-  let start = 0;
-  if (cursorSeq) {
-    const idx = pool.findIndex((c) => c.commentSeq === cursorSeq);
-    start = idx >= 0 ? idx + 1 : pool.length;
-  }
-
-  const page = pool.slice(start, start + size);
-  const hasNext = start + size < pool.length;
-  const nextCursor = hasNext && page.length ? page.at(-1)!.commentSeq : 0;
-
-  return {
-    content: page,
-    comments: page,
-    commentHasNext: hasNext,
-    commentNextCursor: nextCursor,
-  };
-}
-
-/** 커서 기반 */
 export function commentPagination(
   letterSeq: number,
   size = 3,
   cursorSeq?: number,
 ): CommentPagination {
-  return sliceLetterComments(letterSeq, size, cursorSeq);
+  return commentPoolManager.createAndSlice(
+    `letter_${letterSeq}`,
+    50,
+    "letterSeq",
+    letterSeq,
+    size,
+    cursorSeq,
+  );
 }
 
-/* ------------------------- 편지 상세 생성 ------------------------- */
+/** 편지 상세 생성  */
 function heavenLetterDetail(seq?: number): HeavenLetterDetail {
   const writeDt = faker.date.past();
   const anonymityFlag = faker.helpers.arrayElement<"Y" | "N">(["Y", "N"]);
