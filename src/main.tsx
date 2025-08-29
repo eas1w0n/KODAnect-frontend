@@ -1,3 +1,10 @@
+import { worker } from "@/mocks/browser.ts";
+
+await worker.start({
+  serviceWorker: { url: "/mockServiceWorker.js" },
+  onUnhandledRequest: "bypass", // 등록 안 된 요청은 에러 발생
+});
+
 import "@/shared/styles/index.css";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
