@@ -63,8 +63,7 @@ function heavenLetterDetail(seq?: number): HeavenLetterDetail {
   };
 }
 
-/* ---------- 목록/정렬/커서 페이징 (기존 유지) ---------- */
-/** 한 번만 생성해 재사용 */
+/** 전역 데이터셋 생성 및 정렬 */
 export const allHeavenLetters: HeavenLetterDetail[] = Array.from({ length: TOTAL }, () =>
   heavenLetterDetail(),
 );

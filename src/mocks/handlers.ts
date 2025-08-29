@@ -3,6 +3,7 @@ import {
   donorListResponse,
   donorDetailResponse,
   makeCommentPagination,
+  makeHeavenLetterPagination,
 } from "@/mocks/data/Memorial";
 import {
   heavenLetterDetailResponse,
@@ -47,6 +48,22 @@ export const handlers = [
 
     return HttpResponse.json(
       { success: true, code: 200, message: "댓글 조회 성공", data },
+      { status: 200 },
+    );
+  }),
+
+  // 기증자 편지 더보기
+  http.get("*/heavenLetters/:letterSeq/remembrance", ({ request, params }) => {
+    const url = new URL(request.url);
+    const size = Number(url.searchParams.get("size")) || 3;
+    const cursor = url.searchParams.get("cursor");
+    const cursorSeq = cursor ? Number(cursor) : undefined;
+    const donateSeq = Number(params.letterSeq);
+
+    const data = makeHeavenLetterPagination(donateSeq, size, cursorSeq);
+
+    return HttpResponse.json(
+      { success: true, code: 200, message: "편지 조회 성공", data },
       { status: 200 },
     );
   }),

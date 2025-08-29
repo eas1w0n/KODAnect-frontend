@@ -7,6 +7,7 @@ import type { HeavenLetterPagination } from "@/shared/api/members-view/letter/ty
 import type { CommentPagination } from "@/shared/api/recipient-view/comment/types";
 import { createCursorPagination, createDateDescSorter } from "@/mocks/utils/paginate";
 import { commentPoolManager } from "@/mocks/utils/commentPool";
+import { letterPoolManager } from "@/mocks/utils/letterPool";
 
 /** 시드 고정 */
 faker.seed(42);
@@ -154,22 +155,14 @@ export function makeCommentPagination(
   );
 }
 
-// 편지 페이지네이션 생성 함수
-export function makeHeavenLetterPagination(donateSeq: number, size = 3): HeavenLetterPagination {
-  const letters = Array.from({ length: size }, () => ({
-    letterSeq: faker.number.int({ min: 1, max: 10000 }),
-    letterTitle: faker.lorem.words(3),
-    readCount: faker.number.int({ min: 0, max: 100 }),
-    writeTime: faker.date.past().toISOString().slice(0, 10),
-  }));
+// 기증자별 편지 풀 유틸 사용
+export function makeHeavenLetterPagination(
+  donateSeq: number,
+  size = 3,
+  cursorSeq?: number,
+): HeavenLetterPagination {
+  const donor = ALL_DONORS.find((d) => d.donateSeq === donateSeq);
+  const poolSize = donor?.letterCount ?? 0;
 
-  // 최신순
-  letters.sort((a, b) => new Date(b.writeTime).getTime() - new Date(a.writeTime).getTime());
-
-  return {
-    content: letters,
-    nextCursor: 0,
-    hasNext: false,
-    totalCount: size,
-  };
+  return letterPoolManager.createAndSlice(donateSeq, poolSize, size, cursorSeq);
 }
