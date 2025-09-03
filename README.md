@@ -4,15 +4,15 @@
 
 #### [🔗 프로젝트 보러가기](https://kodanect-frontend.netlify.app/home)
 
-![cover](/public//images/readme_cover.png)
-
-이 프로젝트는 한국장기조직기증원(KODA) 공식 홈페이지를 PC와 모바일에서 모두 효율적으로 관리할 수 있는 현대적인 웹사이트로 개편하기 위해 시작되었습니다.<br />
-누구나 쉽고 편리하게 정보를 얻고 참여할 수 있도록, 웹 접근성과 사용자 경험을 한층 강화한 새로운 공공 서비스 웹사이트 구축을 목표로 했습니다.
-
 > ⚠️ 원본 프로젝트는 백엔드 서버 종료로 인해 현재 정상 동작하지 않습니다.  
 > 따라서 본 개인 리포에서는 **MSW와 Faker.js를 활용해 Mock API 기반 데모 버전**으로 리팩토링하여 배포하였습니다.  
 > [🔗 데모 버전 보러가기](https://kodanectdemo.netlify.app/) <br />
 > [📂 원본 GitHub 저장소 바로가기](https://github.com/FC-DEV3-Final-Project/KODAnect-frontend)
+
+![cover](/public//images/readme_cover.png)
+
+이 프로젝트는 한국장기조직기증원(KODA) 공식 홈페이지를 PC와 모바일에서 모두 효율적으로 관리할 수 있는 현대적인 웹사이트로 개편하기 위해 시작되었습니다.<br />
+누구나 쉽고 편리하게 정보를 얻고 참여할 수 있도록, 웹 접근성과 사용자 경험을 한층 강화한 새로운 공공 서비스 웹사이트 구축을 목표로 했습니다.
 
 ## ⏰ 프로젝트 일정
 
